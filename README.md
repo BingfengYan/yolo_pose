@@ -1,6 +1,6 @@
 # YOLO-Pose Multi-person Pose estimation model
 This repository is the official implementation of the paper ["**YOLO-Pose: Enhancing YOLO for Multi Person Pose Estimation Using Object Keypoint Similarity Loss**"](https://arxiv.org/abs/2204.06806) , accepted at Deep Learning for Efficient Computer Vision (ECV) workshop
-at CVPR 2022. This repository contains YOLOv5 based models for human pose estimation.
+at CVPR 2022. This repository contains YOLOv5 based models for human pose estimation. fork from https://github.com/TexasInstruments/edgeai-yolov5/tree/yolo-pose
 
 This repository is based on the YOLOv5 training and assumes that all dependency for training YOLOv5 is already installed. Given below is a samle inference.
 <br/> 
