@@ -17,7 +17,7 @@ import tensorrt as trt
 CONF_THRESH = 0.2
 IOU_THRESHOLD = 0.4
 POINT_THRESH = 0.2
-MAX_NUM_DET = 200
+MAX_NUM_DET = 100
 LEN_OUTPUT = 1 + MAX_NUM_DET * (6+51)
 
 def get_img_path_batches(batch_size, img_dir):
@@ -179,24 +179,28 @@ class YoLov5TRT(object):
         output_bbox = host_outputs[1].reshape(self.batch_size, MAX_NUM_DET, -1)
         output_class = host_outputs[2].reshape(self.batch_size, MAX_NUM_DET, -1)
         output_point = host_outputs[3].reshape(self.batch_size, MAX_NUM_DET, -1)
+        print(output_point.shape, output_bbox.shape)
         # np.savetxt('tmp.txt', output.reshape(-1).astype(np.float32))
         # Do postprocess
         for i in range(batch_size):
+            print(output_point[i])
             output = np.concatenate((output_bbox[i], output_prob[i], output_class[i], output_point[i]), axis=-1)
             result_boxes, result_scores, result_classid, result_points = self.post_process(
                 output, batch_origin_h[i], batch_origin_w[i]
             )
+
             # Draw rectangles and labels on the original image
             for j in range(len(result_boxes)):
                 box = result_boxes[j]
                 plot_one_box(
                     box,
                     batch_image_raw[i],
-                    points=result_points,
+                    points=result_points[j],
                     label="{}:{:.2f}".format(
                         categories[int(result_classid[j])], result_scores[j]
                     ),
                 )
+
         return batch_image_raw, end - start
 
     def destroy(self):
@@ -469,7 +473,7 @@ class warmUpThread(threading.Thread):
 if __name__ == "__main__":
     # load custom plugin and engine
     PLUGIN_LIBRARY = "build/libmyplugins.so"
-    engine_file_path = "build/yolov5s6_pose.engine"
+    engine_file_path = "build/Yolov5s6_pose_640.engine"
 
     if len(sys.argv) > 1:
         engine_file_path = sys.argv[1]
