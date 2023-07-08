@@ -42,6 +42,11 @@ using namespace Yolo;
 
 namespace nvinfer1
 {
+    struct __builtin_align__(4) float34 {
+        float a[34];
+    };
+    typedef struct float34 float34;
+
     YoloLayerPlugin::YoloLayerPlugin(int classCount, int netWidth, int netHeight, int maxOut, const std::vector<Yolo::YoloKernel>& vYoloKernel)
     {
         mClassCount = classCount;
@@ -65,7 +70,7 @@ namespace nvinfer1
         CUDA_CHECK(cudaMalloc(&yolo_output[0], YoloLen));  //score
         CUDA_CHECK(cudaMalloc(&yolo_output[1], YoloLen * 4)); //box
         CUDA_CHECK(cudaMalloc(&yolo_output[2], YoloLen));  //class
-        CUDA_CHECK(cudaMalloc(&yolo_output[3], YoloLen * 4)); //point
+        CUDA_CHECK(cudaMalloc(&yolo_output[3], YoloLen * 34)); //point
     }
     YoloLayerPlugin::~YoloLayerPlugin()
     {
@@ -137,7 +142,8 @@ namespace nvinfer1
     Dims YoloLayerPlugin::getOutputDimensions(int index, const Dims* inputs, int nbInputDims) TRT_NOEXCEPT
     {
         //output the result to channel
-        int totalsize = ((index == 1 || index==3) ? 4 : 1);
+        //int totalsize = ((index == 1 || index==3) ? 4 : 1);
+        int totalsize = (index == 1 ? 4 : (index==3 ? 34 : 1));
         return Dims3(mMaxOutObject, totalsize, 1);
     }
 
@@ -307,20 +313,19 @@ namespace nvinfer1
             auto in_scores = static_cast<const float *>(inputs[0]) + batch * count;
             auto in_boxes = static_cast<const float4 *>(inputs[1]) + batch * count;
             auto in_classes = static_cast<const float *>(inputs[2]) + batch * count;
-            auto in_points = static_cast<const float4 *>(inputs[3]) + batch * count;
-            
+            auto in_points = static_cast<const float34 *>(inputs[3]) + batch * count;
+
             auto out_scores = static_cast<float *>(outputs[0]) + batch * detections_per_im;
             auto out_boxes = static_cast<float4 *>(outputs[1]) + batch * detections_per_im;
             auto out_classes = static_cast<float *>(outputs[2]) + batch * detections_per_im;
-            auto out_points = static_cast<float4 *>(outputs[3]) + batch * detections_per_im;
+            auto out_points = static_cast<float34 *>(outputs[3]) + batch * detections_per_im;
             
-
-            // float tmp[10];
-            // cudaMemcpyAsync(tmp, in_scores, 10 * sizeof(float), cudaMemcpyDeviceToHost, stream);
-            // printf("input %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f\n", tmp[0],tmp[1],tmp[2],tmp[3],tmp[4],tmp[5],tmp[6],tmp[7],tmp[8],tmp[9]);
-            // cudaMemcpyAsync(tmp, out_scores, 10 * sizeof(float), cudaMemcpyDeviceToHost, stream);
-            // printf("output %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f\n", tmp[0],tmp[1],tmp[2],tmp[3],tmp[4],tmp[5],tmp[6],tmp[7],tmp[8],tmp[9]);
-
+            //float tmp[10];
+            //cudaMemcpyAsync(tmp, in_points, 10 * sizeof(float), cudaMemcpyDeviceToHost, stream);
+            //printf("input %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f\n", tmp[0],tmp[1],tmp[2],tmp[3],tmp[4],tmp[5],tmp[6],tmp[7],tmp[8],tmp[9]);
+            //cudaMemcpyAsync(tmp, out_points, 10 * sizeof(float), cudaMemcpyDeviceToHost, stream);
+            //printf("output %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f\n", tmp[0],tmp[1],tmp[2],tmp[3],tmp[4],tmp[5],tmp[6],tmp[7],tmp[8],tmp[9]);
+	    
             // Discard null scores
             thrust::transform(on_stream, in_scores, in_scores + count,
             flags, thrust::placeholders::_1 > 0.0f);
@@ -355,6 +360,9 @@ namespace nvinfer1
             thrust::gather(on_stream, indices, indices + num_detections, in_boxes, out_boxes);
             thrust::gather(on_stream, indices, indices + num_detections, in_classes, out_classes);
             thrust::gather(on_stream, indices, indices + num_detections, in_points, out_points);
+            //printf("num_detections %d \n", num_detections);
+            //cudaMemcpyAsync(tmp, out_points, 10 * sizeof(float), cudaMemcpyDeviceToHost, stream);
+            //printf("output %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f %0.2f\n", tmp[0],tmp[1],tmp[2],tmp[3],tmp[4],tmp[5],tmp[6],tmp[7],tmp[8],tmp[9]);
 
             // printf("num_detections %d \n", num_detections);
             // cudaMemcpyAsync(tmp, out_scores, 10 * sizeof(float), cudaMemcpyDeviceToHost, stream);
@@ -395,13 +403,13 @@ namespace nvinfer1
             float *fscore = output[0] + bnIdx * maxoutobject;
             float *fboxes = output[1] + bnIdx * maxoutobject * 4;
             float *fclass = output[2] + bnIdx * maxoutobject;
-            float *fpoints = output[3] + bnIdx * maxoutobject * 4;
+            float *fpoints = output[3] + bnIdx * maxoutobject * 34;
             int count = (int)atomicAdd(fscore+maxoutobject-1, 1);
             if (count >= maxoutobject) return;
             // char *data = (char*)res_count + sizeof(float) + count * sizeof(Detection);
             // Detection *det = (Detection*)(data);
             fboxes = fboxes + count * 4;
-            fpoints = fpoints + count * 4;
+            fpoints = fpoints + count * 34;
             fscore = fscore + count;
             fclass = fclass + count;
 
@@ -432,14 +440,13 @@ namespace nvinfer1
             fscore[0] = box_prob * max_cls_prob;
             fclass[0] = class_id;
 
-            fpoints[0] = (curInput[idx + k * info_len_i * total_grid + (kpt_s+3*15+0) * total_grid] * 2.0f - 0.5f + col) * netwidth / yoloWidth;
-            fpoints[1] = (curInput[idx + k * info_len_i * total_grid + (kpt_s+3*15+1) * total_grid] * 2.0f - 0.5f + row) * netheight / yoloHeight;
-            fpoints[2] = (curInput[idx + k * info_len_i * total_grid + (kpt_s+3*16+0) * total_grid] * 2.0f - 0.5f + col) * netwidth / yoloWidth;
-            fpoints[3] = (curInput[idx + k * info_len_i * total_grid + (kpt_s+3*16+1) * total_grid] * 2.0f - 0.5f + row) * netheight / yoloHeight;
+            for (int i = 0; i < 17; i++){
+	    	fpoints[2*i+0] = (curInput[idx + k * info_len_i * total_grid + (kpt_s+3*i+0) * total_grid] * 2.0f - 0.5f + col) * netwidth / yoloWidth;
+	        fpoints[2*i+1] = (curInput[idx + k * info_len_i * total_grid + (kpt_s+3*i+1) * total_grid] * 2.0f - 0.5f + row) * netheight / yoloHeight;
             
-
-            //printf("%f %f %f %f %d %d\n", fpoints[i], Logist(curInput[idx + k * info_len_i * total_grid + (4+i) * total_grid]), anchors[2 * k], anchors[2 * k+1], col, row);
-        }
+	    }
+	    //printf("%f %f %f %f %f %f %f %f %f %f\n", fpoints[0], fpoints[1], fpoints[2], fpoints[3], fpoints[4], fpoints[5], fboxes[0], fboxes[1], fboxes[2], fboxes[2]);      
+	}
     }
 
     void YoloLayerPlugin::forwardGpu(const float* const* inputs, float** output, cudaStream_t stream, int batchSize)
@@ -449,7 +456,7 @@ namespace nvinfer1
             CUDA_CHECK(cudaMemsetAsync(output[0] + idx * mMaxOutObject, 0, sizeof(float)*mMaxOutObject, stream));
             CUDA_CHECK(cudaMemsetAsync(output[1] + idx * mMaxOutObject*4, 0, sizeof(float)*mMaxOutObject*4, stream));
             CUDA_CHECK(cudaMemsetAsync(output[2] + idx * mMaxOutObject, 0, sizeof(float)*mMaxOutObject, stream));
-            CUDA_CHECK(cudaMemsetAsync(output[3] + idx * mMaxOutObject*4, 0, sizeof(float)*mMaxOutObject*4, stream));
+            CUDA_CHECK(cudaMemsetAsync(output[3] + idx * mMaxOutObject*34, 0, sizeof(float)*mMaxOutObject*34, stream));
         }
         int numElem = 0;
         for (unsigned int i = 0; i < mYoloKernel.size(); ++i) {
@@ -528,4 +535,5 @@ namespace nvinfer1
         return obj;
     }
 }
+
 
