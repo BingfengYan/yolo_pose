@@ -9,8 +9,8 @@
 namespace Yolo
 {
     static constexpr int CHECK_COUNT = 3;
-    static constexpr float IGNORE_THRESH = 0.1f;
-     static constexpr float NMS_THRESH = 0.45f;
+    static constexpr float IGNORE_THRESH = 0.5f;
+     static constexpr float NMS_THRESH = 0.3f;
     static constexpr float POSE_THRESH = 0.1f;
     struct YoloKernel
     {
@@ -18,11 +18,11 @@ namespace Yolo
         int height;
         float anchors[CHECK_COUNT * 2];
     };
-    static constexpr int MAX_OUTPUT_BBOX_COUNT = 200;
+    static constexpr int MAX_OUTPUT_BBOX_COUNT = 100;
     static constexpr int CLASS_NUM = 1;
     static constexpr int INPUT_H = 384;  // yolov5's input height and width must be divisible by 32.
     static constexpr int INPUT_W = 640;
-    static constexpr int MAX_BATCH = 12;
+    static constexpr int MAX_BATCH = 2;
     static constexpr int NKPT = 17;
     static constexpr int NO_KPT = 51;  // NKPT * 3
 
